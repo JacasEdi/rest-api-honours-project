@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
+
 const Course = require('../models/course');
 const { transformCourse } = require('../response-parsers');
+
 
 // Get single course
 router.get('/:courseId', async (req, res, next) => {
@@ -63,7 +65,6 @@ router.post('/', async (req, res, next) => {
         });
     }
     catch (err) {
-        console.log(err);
         res.status(500).json({ error: err });
     }
 });
@@ -94,6 +95,7 @@ router.patch('/:courseId', async (req, res, next) => {
     }
 });
 
+// Delete course
 router.delete('/:courseId', async (req, res, next) => {
     try {
         await Course.deleteOne({ _id: req.params.courseId });

@@ -3,20 +3,20 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 
 const Learner = require('../models/learner');
-const Enrolment = require('../models/enrolment');
-const { transformLearner } = require('../response-parsers')
+const { transformLearner } = require('../response-parsers');
 
 
 // Get single learner
 router.get('/:learnerId', async (req, res, next) => {
     try {
-        const learner = await Learner.findById(req.params.learnerId).populate({
+        const learner = await Learner.findById(req.params.learnerId)
+            .populate({
             path: 'enrolments',
             populate: {
                 path: 'course',
                 model: 'Course'
-            }
-        }).select('-__v -password');
+            }})
+            .select('-__v -password');
 
         if(learner) {
             res.status(200).json(transformLearner(learner));
@@ -38,39 +38,28 @@ router.get('/', async (req, res, next) => {
             populate: {
                 path: 'course',
                 model: 'Course'
-            }
-        }).select('-__v -password');
+            }}).select('-__v -password');
+
         const response = {
             count: learners.length,
             learners: learners.map(learner => {
-                return {
-                    ...learner._doc,
-                    request: {
-                        type: 'GET',
-                        url: 'http://localhost:3100/learners/' + learner._id
-                    }
-                }
+                return transformLearner(learner);
             })
         };
-        console.log(response);
         res.status(200).json(response);
     }
     catch (err) {
-        console.log(err);
         res.status(500).json({ error: err });
     }
 });
 
+// Create a new learner
 router.post('/', async (req, res, next) => {
     try {
         const existingLearner = await Learner.findOne({ email: req.body.email });
-        if (existingLearner)
-        {
-            res.status(500).json({ message: 'Learner already exists'} );
-        }
+        if (existingLearner) res.status(500).json({ message: 'Learner already exists'} );
 
         const hashedPassword = await bcrypt.hash(req.body.password, 12);
-
         const learner = new Learner({
             firstName: req.body.firstName,
             lastName: req.body.lastName,
@@ -78,9 +67,8 @@ router.post('/', async (req, res, next) => {
             password: hashedPassword,
             age: req.body.age
         });
-        const result = await learner.save();
-        console.log(result);
 
+        const result = await learner.save();
         res.status(201).json({
             createdLearner: {
                 firstName: result.firstName,
@@ -95,21 +83,47 @@ router.post('/', async (req, res, next) => {
         });
     }
     catch (err) {
-        console.log(err);
         res.status(500).json({ error: err });
     }
 });
 
-router.patch('/:learnerId', (req, res, next) => {
-    res.status(200).json({
-        message: 'updated learner'
-    });
+// Update learner
+router.patch('/:learnerId', async (req, res, next) => {
+    try {
+        const propsToUpdate = {};
+        for (const prop of req.body) {
+            propsToUpdate[prop.propName] = prop.value;
+        }
+
+        await Learner.update(
+            { _id: req.params.learnerId },
+            { $set: propsToUpdate }
+        );
+
+        res.status(200).json({
+            message: 'Learner updated',
+            request: {
+                type: 'GET',
+                url: 'http://localhost:3100/learners/' + req.params.learnerId
+            }
+        });
+    }
+    catch (err) {
+        res.status(500).json({ error: err });
+    }
 });
 
-router.delete('/:learnerId', (req, res, next) => {
-    res.status(200).json({
-        message: 'deleted learner'
-    });
+// Delete learner
+router.delete('/:learnerId', async (req, res, next) => {
+    try {
+        await Learner.deleteOne({ _id: req.params.learnerId });
+        res.status(200).json({
+            message: 'Learner deleted'
+        });
+    }
+    catch (err) {
+        res.status(500).json({ error: err });
+    }
 });
 
 module.exports = router;

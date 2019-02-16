@@ -15,27 +15,31 @@ const transformCourse = course => {
 const transformEnrolment = enrolment => {
     return {
         ...enrolment._doc,
-        id: enrolment.id,
+        course: transformCourse(enrolment.course),
         createdAt: parseDate(enrolment.createdAt),
-        updatedAt: parseDate(enrolment.updatedAt)
+        updatedAt: parseDate(enrolment.updatedAt),
+        request: {
+            type: 'GET',
+            url: 'http://localhost:3100/enrolments/' + enrolment._id
+        }
     };
 };
 
 const transformEnrolments = enrolments => {
     return enrolments.map(enrolment => {
-        return {
-            ...enrolment._doc,
-            id: enrolment.id,
-            createdAt: parseDate(enrolment.createdAt),
-            updatedAt: parseDate(enrolment.updatedAt)
-        };
+        return transformEnrolment(enrolment);
     });
 };
 
 const transformLearner = learner => {
     return {
         ...learner._doc,
+        password: null,
         enrolments: transformEnrolments(learner.enrolments),
+        request: {
+            type: 'GET',
+            url: 'http://localhost:3100/learners/' + learner._id
+        }
     };
 };
 

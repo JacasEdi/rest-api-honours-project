@@ -4,26 +4,39 @@ const router = express.Router();
 const Enrolment = require('../models/enrolment');
 const Course = require('../models/course');
 const Learner = require('../models/learner');
+const { transformEnrolment, transformCourse, transformLearner } = require('../response-parsers');
 
 
+// Get single enrolment
+router.get('/:enrolmentId', async (req, res, next) => {
+    try {
+        const enrolment = await Enrolment.findById(req.params.enrolmentId)
+            .populate([{path: 'learner'}, {path: 'course'}])
+            .select('-__v');
 
+        if(enrolment) {
+            res.status(200).json(transformEnrolment(enrolment));
+        }
+        else {
+            res.status(404).json({ message: 'Enrolment not found' })
+        }
+    }
+    catch (err) {
+        console.log(err);
+        res.status(500).json({ error: err });
+    }
+});
+
+// Get all enrolments
 router.get('/', async (req, res, next) => {
     try {
-        const enrolments = await Enrolment.find().select('-__v');
+        const enrolments = await Enrolment.find().populate([{path: 'learner'}, {path: 'course'}]).select('-__v');
         const response = {
             count: enrolments.length,
             enrolments: enrolments.map(enrolment => {
-                console.log(enrolment);
-                return {
-                    ...enrolment._doc,
-                    request: {
-                        type: 'GET',
-                        url: 'http://localhost:3100/enrolments/' + enrolment._id
-                    }
-                }
+                return transformEnrolment(enrolment);
             })
         };
-        console.log(response);
         res.status(200).json(response);
     }
     catch (err) {
@@ -32,6 +45,7 @@ router.get('/', async (req, res, next) => {
     }
 });
 
+// Create a new enrolment
 router.post('/', async (req, res, next) => {
     try {
         const fetchedCourse = await Course.findById(req.body.courseId);
@@ -39,18 +53,19 @@ router.post('/', async (req, res, next) => {
 
         if(fetchedCourse && fetchedLearner) {
             const enrolment = new Enrolment({
-                course: req.body.courseId,
-                learner: req.body.learnerId,
+                course: fetchedCourse,
+                learner: fetchedLearner,
                 progress: req.body.progress,
             });
+
             const result = await enrolment.save();
-            console.log(result);
+            await Learner.update({ _id: fetchedLearner._id }, { $push: { enrolments: result._id } });
 
             res.status(201).json({
                 createdEnrolment: {
                     _id: result._id,
-                    course: result.course,
-                    learner: result.learner,
+                    course: transformCourse(result.course),
+                    learner: transformLearner(result.learner),
                     progress: result.progress,
                     request: {
                         type: 'GET',
@@ -66,28 +81,11 @@ router.post('/', async (req, res, next) => {
         }
     }
     catch (err) {
-        console.log(err);
         res.status(500).json({ error: err });
     }
 });
 
-router.get('/:enrolmentId', async (req, res, next) => {
-    try {
-        const enrolment = await Enrolment.findById(req.params.enrolmentId).select('-__v');
-
-        if(enrolment) {
-            res.status(200).json(enrolment._doc);
-        }
-        else {
-            res.status(404).json({ message: 'Enrolment not found' })
-        }
-    }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
-    }
-});
-
+// Update enrolment
 router.patch('/:enrolmentId', async (req, res, next) => {
     try {
         const propsToUpdate = {};
@@ -95,12 +93,11 @@ router.patch('/:enrolmentId', async (req, res, next) => {
             propsToUpdate[prop.propName] = prop.value;
         }
 
-        const result = await Enrolment.update(
+        await Enrolment.update(
             { _id: req.params.enrolmentId },
             { $set: propsToUpdate }
         );
 
-        console.log(result);
         res.status(200).json({
             message: 'Enrolment updated',
             request: {
@@ -110,20 +107,22 @@ router.patch('/:enrolmentId', async (req, res, next) => {
         });
     }
     catch (err) {
-        console.log(err);
         res.status(500).json({ error: err });
     }
 });
 
+// Delete enrolment
 router.delete('/:enrolmentId', async (req, res, next) => {
     try {
-        const result = await Enrolment.deleteOne({ _id: req.params.enrolmentId });
+        const enrolment = await Enrolment.findById(req.params.enrolmentId);
+        await Enrolment.deleteOne({ _id: req.params.enrolmentId });
+        await Learner.update({ _id: enrolment.learner }, { $pull: { enrolments: enrolment._id } });
+
         res.status(200).json({
-            message: 'Enrolment deleted'
+            message: 'Enrolment cancelled successfully.'
         });
     }
     catch (err) {
-        console.log(err);
         res.status(500).json({ error: err });
     }
 });
