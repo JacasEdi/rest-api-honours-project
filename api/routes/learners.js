@@ -9,14 +9,18 @@ const { transformLearner } = require('../response-parsers');
 // Get single learner
 router.get('/:learnerId', async (req, res, next) => {
     try {
+        // Optimised route with Learner, Enrolment, and Course data
         const learner = await Learner.findById(req.params.learnerId)
             .populate({
-            path: 'enrolments',
-            populate: {
-                path: 'course',
-                model: 'Course'
-            }})
+                path: 'enrolments',
+                populate: {
+                    path: 'course',
+                    model: 'Course'
+                }})
             .select('-__v -password');
+
+        // Atomic route with only Learner data and IDs of Enrolments
+        // const learner = await Learner.findById(req.params.learnerId);
 
         if(learner) {
             res.status(200).json(transformLearner(learner));

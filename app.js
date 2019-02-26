@@ -11,6 +11,9 @@ const enrolmentRoutes = require('./api/routes/enrolments');
 
 const app = express();
 
+// disable caching to prevent 304 response
+app.disable('etag');
+
 mongoose.connect(`mongodb+srv://jacas:w97LPKw77AgP2Usj@cluster0-vvdc2.mongodb.net/honours-project?retryWrites=true`);
 
 app.use((req, res, next) => {

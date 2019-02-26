@@ -10,9 +10,13 @@ const { transformEnrolment, transformCourse, transformLearner } = require('../re
 // Get single enrolment
 router.get('/:enrolmentId', async (req, res, next) => {
     try {
+        // Optimised route with Enrolment and Course data
         const enrolment = await Enrolment.findById(req.params.enrolmentId)
             .populate([{path: 'learner'}, {path: 'course'}])
             .select('-__v');
+
+        // Atomic route with only Enrolment data and ID of Course
+        // const enrolment = await Enrolment.findById(req.params.enrolmentId);
 
         if(enrolment) {
             res.status(200).json(transformEnrolment(enrolment));
